@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Christmas Smart Clock Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Prompt:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --xmas-red: #c41e3a;
+            --xmas-green: #0b6623;
+            --xmas-gold: #ffd700;
+            --lcd-bg: #112211;
+            --lcd-text: #33ff33;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            font-family: 'Prompt', sans-serif;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background: rgba(20, 30, 25, 0.95);
+            border: 4px solid var(--xmas-gold);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(255, 215, 0, 0.4);
+            text-align: center;
+            max-width: 450px;
+            width: 100%;
+        }
+
+        h1 {
+            color: var(--xmas-gold);
+            font-size: 24px;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: #a8dadc;
+            margin-bottom: 25px;
+        }
+
+        /* จำลองหน้าจอ LCD 16x2 */
+        .lcd-screen {
+            background-color: var(--lcd-bg);
+            border: 6px solid #224422;
+            border-radius: 10px;
+            padding: 20px;
+            font-family: 'Orbitron', monospace;
+            color: var(--lcd-text);
+            font-size: 22px;
+            letter-spacing: 2px;
+            text-shadow: 0 0 8px rgba(51, 255, 51, 0.7);
+            margin-bottom: 25px;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.8);
+            min-height: 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .lcd-line {
+            margin: 5px 0;
+        }
+
+        .mode-indicator {
+            font-size: 12px;
+            color: var(--xmas-gold);
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* ปุ่มจำลองฮาร์ดแวร์ */
+        .control-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .btn {
+            background: linear-gradient(to bottom, var(--xmas-red), #900c1e);
+            color: white;
+            border: 2px solid var(--xmas-gold);
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-family: 'Prompt', sans-serif;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0,0,0,0.4);
+            filter: brightness(1.1);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        .btn-green {
+            background: linear-gradient(to bottom, var(--xmas-green), #043912);
+        }
+
+        .status-badge {
+            margin-top: 20px;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 13px;
+            display: inline-block;
+        }
+
+        .alarm-active {
+            background-color: var(--xmas-red);
+            animation: pulse 1s infinite;
+        }
+
+        .alarm-standby {
+            background-color: #333;
+            color: #888;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🎄 Christmas Smart Clock 🎅</h1>
+        <div class="subtitle">IoT Embedded Dashboard</div>
+
+        <div class="mode-indicator" id="modeIndicator">Mode: Normal (Time Display)</div>
+
+        <!-- จำลองหน้าจอ LCD -->
+        <div class="lcd-screen">
+            <div class="lcd-line" id="lcdLine1">07/11/2026</div>
+            <div class="lcd-line" id="lcdLine2">15:11:00</div>
+        </div>
+
+        <!-- แผงปุ่มจำลองการใช้งานจริง -->
+        <div class="control-panel">
+            <button class="btn btn-green" onclick="changeMode()">🔄 เปลี่ยนโหมด</button>
+            <button class="btn" onclick="handleButtonAction()">⚡ กดปุ่ม / ตั้งค่า</button>
+        </div>
+
+        <div>
+            <div id="statusBadge" class="status-badge alarm-standby">สถานะปลุก: ปกติ</div>
+        </div>
+    </div>
+
+    <script>
+        let currentMode = 0; // 0: Time, 1: Sensor, 2: Set Date, 3: Set Time, 4: Set Alarm
+        let editSubMode = 0;
+        
+        // ข้อมูลจำลอง (จำลองค่าจาก ESP32)
+        let s_hour = 15, s_minute = 11, s_second = 0;
+        let s_day = 7, s_month = 11, s_year = 2026;
+        let a_hour = 7, a_minute = 0;
+        let current_temp = 28.5;
+        let current_hum = 65.0;
+        let isAlarmActive = false;
+
+        // ฟังก์ชันจำลองเวลาเดินทุก 1 วินาที
+        setInterval(() => {
+            s_second++;
+            if (s_second >= 60) {
+                s_second = 0;
+                s_minute++;
+                if (s_minute >= 60) {
+                    s_minute = 0;
+                    s_hour = (s_hour + 1) % 24;
+                }
+            }
+            
+            // เช็คเวลาปลุก
+            if (s_hour === a_hour && s_minute === a_minute && s_second === 0) {
+                isAlarmActive = true;
+            }
+
+            updateDisplay();
+        }, 1000);
+
+        function updateDisplay() {
+            const line1 = document.getElementById('lcdLine1');
+            const line2 = document.getElementById('lcdLine2');
+            const indicator = document.getElementById('modeIndicator');
+            const badge = document.getElementById('statusBadge');
+
+            if (isAlarmActive) {
+                line1.innerText = "   * ALARM! *   ";
+                line2.innerText = "   Time is up!   ";
+                indicator.innerText = "⚠️ แจ้งเตือนปลุกทำงาน!";
+                badge.className = "status-badge alarm-active";
+                badge.innerText = "สถานะปลุก: กำลังดัง! (กดปุ่มเพื่อเลื่อน/หยุด)";
+                return;
+            } else {
+                badge.className = "status-badge alarm-standby";
+                badge.innerText = `นาฬิกาปลุกตั้งไว้: ${String(a_hour).padStart(2, '0')}:${String(a_minute).padStart(2, '0')}`;
+            }
+
+            switch(currentMode) {
+                case 0:
+                    indicator.innerText = "Mode 0: แสดงวันและเวลา (Time)";
+                    line1.innerText = `${String(s_day).padStart(2,'0')}/${String(s_month).padStart(2,'0')}/${s_year}`;
+                    line2.innerText = `${String(s_hour).padStart(2,'0')}:${String(s_minute).padStart(2,'0')}:${String(s_second).padStart(2,'0')}`;
+                    break;
+                case 1:
+                    indicator.innerText = "Mode 1: เซ็นเซอร์สิ่งแวดล้อม (DHT11)";
+                    line1.innerText = `Temp: ${current_temp.toFixed(1)} C`;
+                    line2.innerText = `Hum:  ${current_hum.toFixed(1)} %`;
+                    break;
+                case 2:
+                    indicator.innerText = "Mode 2: ตั้งแต่วันที่ (Set Date)";
+                    line1.innerText = "SET DATE";
+                    if(editSubMode === 0) line2.innerText = `Day:   ${String(s_day).padStart(2,'0')}`;
+                    else if(editSubMode === 1) line2.innerText = `Month: ${String(s_month).padStart(2,'0')}`;
+                    else line2.innerText = `Year:  ${s_year}`;
+                    break;
+                case 3:
+                    indicator.innerText = "Mode 3: ตั้งเวลา (Set Time)";
+                    line1.innerText = "SET TIME";
+                    if(editSubMode === 0) line2.innerText = `Hour:   ${String(s_hour).padStart(2,'0')}`;
+                    else if(editSubMode === 1) line2.innerText = `Minute: ${String(s_minute).padStart(2,'0')}`;
+                    else line2.innerText = `Second: ${String(s_second).padStart(2,'0')}`;
+                    break;
+                case 4:
+                    indicator.innerText = "Mode 4: ตั้งเวลาปลุก (Set Alarm)";
+                    line1.innerText = "SET ALARM";
+                    if(editSubMode === 0) line2.innerText = `Hour:   ${String(a_hour).padStart(2,'0')}`;
+                    else line2.innerText = `Minute: ${String(a_minute).padStart(2,'0')}`;
+                    break;
+            }
+        }
+
+        // จำลองการกดปุ่มเปลี่ยนโหมด
+        function changeMode() {
+            if (isAlarmActive) {
+                isAlarmActive = false;
+                return;
+            }
+            currentMode = (currentMode + 1) % 5;
+            editSubMode = 0;
+            updateDisplay();
+        }
+
+        // จำลองการกดปุ่มดำเนินการ/แก้ไขค่า
+        function handleButtonAction() {
+            if (isAlarmActive) {
+                // จำลองระบบ Snooze / หยุดปลุก (กดครั้งแรกเลื่อนปลุก, กดครั้งที่สองหยุด)
+                isAlarmActive = false;
+                return;
+            }
+
+            if (currentMode >= 2) {
+                editSubMode++;
+                let maxSub = (currentMode === 2) ? 2 : (currentMode === 3 ? 2 : 1);
+                if (editSubMode > maxSub) {
+                    editSubMode = 0;
+                    currentMode = 0; // วนกลับโหมดปกติเมื่อตั้งค่าเสร็จ
+                }
+            }
+            updateDisplay();
+        }
+    </script>
+</body>
+</html>
