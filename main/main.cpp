@@ -6,13 +6,58 @@
 #include "wifi_time.h"
 #include "button_safe.h"
 #include "sensor_dht.h"
+#include "alarm_buzzer.h"
 
 static const char *TAG = "SMART_CLOCK";
+bool is_alarm_active = false; // ตัวแปรสถานะกำลังปลุก
+static int last_logged_mode = -1; // เก็บสถานะโหมดล่าสุดเพื่อพริ้นต์ Log เฉพาะตอนเปลี่ยน
 
 void draw_screen() {
     char buf1[32], buf2[32];
 
-    if (current_mode == 0) {
+    // พิมพ์ Log บน Serial Monitor ให้สอดคล้องและแสดงค่าเดียวกับหน้าจอ LCD
+    if (is_alarm_active) {
+        ESP_LOGI(TAG, "Monitor Status: ALARM TRIGGERED! 🔔 (Time is up!)");
+    } else {
+        switch (current_mode) {
+            case 0:
+                ESP_LOGI(TAG, "LCD Mode 0 (Time): Date: %02d/%02d/%04d | Time: %02d:%02d:%02d", 
+                         s_day, s_month, s_year, s_hour, s_minute, s_second);
+                break;
+            case 1:
+                ESP_LOGI(TAG, "LCD Mode 1 (Sensor): Temp: %.1f C | Hum: %.1f %%", current_temp, current_hum);
+                break;
+            case 2:
+                if (edit_sub_mode == 0)
+                    ESP_LOGI(TAG, "LCD Mode 2 (Set Date): Editing Day -> Day: %02d", s_day);
+                else if (edit_sub_mode == 1)
+                    ESP_LOGI(TAG, "LCD Mode 2 (Set Date): Editing Month -> Month: %02d", s_month);
+                else
+                    ESP_LOGI(TAG, "LCD Mode 2 (Set Date): Editing Year -> Year: %04d", s_year);
+                break;
+            case 3:
+                if (edit_sub_mode == 0)
+                    ESP_LOGI(TAG, "LCD Mode 3 (Set Time): Editing Hour -> Hour: %02d", s_hour);
+                else if (edit_sub_mode == 1)
+                    ESP_LOGI(TAG, "LCD Mode 3 (Set Time): Editing Minute -> Minute: %02d", s_minute);
+                else
+                    ESP_LOGI(TAG, "LCD Mode 3 (Set Time): Editing Second -> Second: %02d", s_second);
+                break;
+            case 4:
+                if (edit_sub_mode == 0)
+                    ESP_LOGI(TAG, "LCD Mode 4 (Set Alarm): Editing Hour -> Alarm Hour: %02d", a_hour);
+                else
+                    ESP_LOGI(TAG, "LCD Mode 4 (Set Alarm): Editing Minute -> Alarm Minute: %02d", a_minute);
+                break;
+        }
+    }
+
+    // แสดงหน้าจอ LCD ตามโหมดและสถานะ
+    if (is_alarm_active) {
+        sprintf(buf1, "  * ALARM! *  ");
+        sprintf(buf2, " Time is up!    ");
+    }
+    else if (current_mode == 0) {
         // หน้า 1: วันที่ / เวลา
         sprintf(buf1, "   %02d/%02d/%04d   ", s_day, s_month, s_year);
         sprintf(buf2, "    %02d:%02d:%02d    ", s_hour, s_minute, s_second);
@@ -40,7 +85,7 @@ void draw_screen() {
         // หน้า 5: ตั้งปลุก
         sprintf(buf1, "SET ALARM       ");
         if (edit_sub_mode == 0) sprintf(buf2, "Hour:   %02d      ", a_hour);
-        else sprintf(buf2, "Minute: %02d      ", a_minute);
+        else if (edit_sub_mode == 1) sprintf(buf2, "Minute: %02d      ", a_minute);
     }
 
     lcd_print_xy(0, 0, buf1);
@@ -56,8 +101,9 @@ extern "C" void app_main(void) {
     init_wifi_and_sync_time();
     get_current_time(s_hour, s_minute, s_second, s_day, s_month, s_year);
     
-    // 2. เริ่มต้นระบบปุ่มกดและสร้าง Task อ่านค่าเซนเซอร์ DHT11 เบื้องหลัง
+    // 2. เริ่มต้นระบบฮาร์ดแวร์ ปุ่มกด, Buzzer และ Task อ่านค่าเซนเซอร์ DHT11
     init_buttons();
+    init_buzzer();
     xTaskCreate(dht_sensor_task, "dht_task", 2048, NULL, 5, NULL);
     
     ESP_LOGI(TAG, "Smart Clock System Fully Initialized!");
@@ -65,18 +111,34 @@ extern "C" void app_main(void) {
     
     int tick_cnt = 0;
     while (1) {
-        // เช็กปุ่มกดเปลี่ยนโหมดและตั้งค่าตลอดเวลา
+        // เช็กปุ่มกดตลอดเวลา (รองรับการกดปุ่มเพื่อเปลี่ยนโหมด ตั้งค่า และปิดเสียงปลุก)
         if (check_buttons()) {
+            if (is_alarm_active) {
+                is_alarm_active = false;
+                ESP_LOGI(TAG, "Alarm dismissed by user button press.");
+            }
+            draw_screen();
+        }
+
+        // ถ้าระบบอยู่ในโหมดปลุก ให้เล่นเพลง Jingle Bells วนไปพร้อมรีเฟรชจอ
+        if (is_alarm_active) {
+            play_alarm_sound();
             draw_screen();
         }
 
         // นับเวลาเดินทุกๆ 1 วินาที (20 รอบ x 50ms)
-        if (++tick_cnt >= 20) {
+        if (!is_alarm_active && ++tick_cnt >= 20) {
             tick_cnt = 0;
             tick_clock();
             
-            // รีเฟรชหน้าจออัตโนมัติทุกวินาทีเฉพาะหน้าจอเวลา (0) หรือหน้าจออุณหภูมิ (1)
-            if (current_mode == 0 || current_mode == 1) {
+            // เช็กเวลาปลุก เทียบชั่วโมงและนาทีปัจจุบันกับเวลาตั้งปลุก
+            if (s_hour == a_hour && s_minute == a_minute && s_second == 0) {
+                is_alarm_active = true;
+            }
+            
+            // รีเฟรชหน้าจออัตโนมัติทุกวินาทีเฉพาะ "หน้าจอแสดงเวลา (Mode 0)" เท่านั้น
+            // เพื่อให้หน้าจออื่นๆ (เช่น อุณหภูมิหรือหน้าตั้งค่า) ค้างอยู่ได้ตามที่ผู้ใช้เลือก
+            if (current_mode == 0) {
                 draw_screen();
             }
         }

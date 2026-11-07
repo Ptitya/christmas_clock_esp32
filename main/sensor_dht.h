@@ -21,9 +21,9 @@ void dht_sensor_task(void *pvParameters) {
         if (result == ESP_OK) {
             current_temp = t;
             current_hum = h;
-            ESP_LOGI(TAG_DHT, "Sensor OK -> Temp: %.1f C, Hum: %.1f %%", current_temp, current_hum);
+            // ESP_LOGI(TAG_DHT, "Sensor OK -> Temp: %.1f C, Hum: %.1f %%", current_temp, current_hum);
         } else {
-            ESP_LOGW(TAG_DHT, "Sensor Read Failed! Check wiring on GPIO 4");
+            // ESP_LOGW(TAG_DHT, "Sensor Read Failed! Check wiring on GPIO 4");
         }
         
         vTaskDelay(pdMS_TO_TICKS(3000)); // อ่านค่าทุกๆ 3 วินาที
