@@ -15,9 +15,8 @@ bool is_alarm_active = false;
 void draw_screen() {
     char buf1[32], buf2[32];
 
-    // พิมพ์ Log อัปเดตข้อมูลตามหน้าจอ LCD ทุกโหมดแบบเรียลไทม์
     if (is_alarm_active) {
-        ESP_LOGI(TAG, "Status: ALARM TRIGGERED! 🔔 (LED & Buzzer Active)");
+        ESP_LOGI(TAG, "Status: ALARM TRIGGERED! 🔔");
     } else {
         switch (current_mode) {
             case 0:
@@ -28,32 +27,31 @@ void draw_screen() {
                 break;
             case 2:
                 if (edit_sub_mode == 0)
-                    ESP_LOGI(TAG, "LCD Mode 2 (Set Date) -> Editing Day: %02d", s_day);
+                    ESP_LOGI(TAG, "Editing Day: %02d", s_day);
                 else if (edit_sub_mode == 1)
-                    ESP_LOGI(TAG, "LCD Mode 2 (Set Date) -> Editing Month: %02d", s_month);
+                    ESP_LOGI(TAG, "Editing Month: %02d", s_month);
                 else
-                    ESP_LOGI(TAG, "LCD Mode 2 (Set Date) -> Editing Year: %04d", s_year);
+                    ESP_LOGI(TAG, "Editing Year: %04d", s_year);
                 break;
             case 3:
                 if (edit_sub_mode == 0)
-                    ESP_LOGI(TAG, "LCD Mode 3 (Set Time) -> Editing Hour: %02d", s_hour);
+                    ESP_LOGI(TAG, "Editing Hour: %02d", s_hour);
                 else if (edit_sub_mode == 1)
-                    ESP_LOGI(TAG, "LCD Mode 3 (Set Time) -> Editing Minute: %02d", s_minute);
+                    ESP_LOGI(TAG, "Editing Minute: %02d", s_minute);
                 else
-                    ESP_LOGI(TAG, "LCD Mode 3 (Set Time) -> Editing Second: %02d", s_second);
+                    ESP_LOGI(TAG, "Editing Second: %02d", s_second);
                 break;
             case 4:
                 if (edit_sub_mode == 0)
-                    ESP_LOGI(TAG, "LCD Mode 4 (Set Alarm) -> Editing Alarm Hour: %02d", a_hour);
+                    ESP_LOGI(TAG, "Editing Alarm Hour: %02d", a_hour);
                 else
-                    ESP_LOGI(TAG, "LCD Mode 4 (Set Alarm) -> Editing Alarm Minute: %02d", a_minute);
+                    ESP_LOGI(TAG, "Editing Alarm Minute: %02d", a_minute);
                 break;
         }
     }
 
-    // ส่วนของการวาดหน้าจอ LCD ตามปกติ
     if (is_alarm_active) {
-        sprintf(buf1, "   * ALARM! *    ");
+        sprintf(buf1, "   * ALARM! *   ");
         sprintf(buf2, "  Time is up!   ");
     }
     else if (current_mode == 0) {
@@ -91,8 +89,9 @@ extern "C" void app_main(void) {
     
     lcd_print_xy(0, 0, " Connecting to  ");
     lcd_print_xy(0, 1, " WiFi & NTP...  ");
+    
+    // เรียกใช้งานฟังก์ชันเริ่มต้น Wi-Fi และดึงเวลา NTP
     init_wifi_and_sync_time();
-    get_current_time(s_hour, s_minute, s_second, s_day, s_month, s_year);
     
     init_buttons();
     init_buzzer();
@@ -108,7 +107,6 @@ extern "C" void app_main(void) {
             if (is_alarm_active) {
                 is_alarm_active = false;
                 set_led_state(0); 
-                ESP_LOGI(TAG, "Alarm dismissed and LED turned off by user.");
             }
             draw_screen();
         }
@@ -127,10 +125,7 @@ extern "C" void app_main(void) {
                 is_alarm_active = true;
             }
             
-            // รีเฟรชหน้าจออัตโนมัติทุกวินาทีเฉพาะโหมด 0 (เวลา) และโหมด 1 (อุณหภูมิ/ความชื้น)
-            if (current_mode == 0 || current_mode == 1) {
-                draw_screen();
-            }
+            draw_screen();
         }
         
         vTaskDelay(pdMS_TO_TICKS(50)); 

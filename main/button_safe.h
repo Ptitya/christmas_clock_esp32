@@ -7,13 +7,19 @@
 #include <stdio.h>
 
 #define BTN_MODE GPIO_NUM_13   
-#define BTN_INC  GPIO_NUM_27   // ย้ายมาใช้ขา 27 ปลอดภัยและเสถียรที่สุด
+#define BTN_INC  GPIO_NUM_27   // ขาปุ่มเพิ่มค่า
+
+// ใช้ extern เพื่ออ้างอิงตัวแปรเวลาที่ประกาศไว้จริงใน wifi_time.h
+extern int s_hour;
+extern int s_minute;
+extern int s_second;
+extern int s_day;
+extern int s_month;
+extern int s_year;
 
 static int current_mode = 0; // 0=เวลา, 1=อุณหภูมิ, 2=ตั้งวัน, 3=ตั้งเวลา, 4=ตั้งปลุก
 static int edit_sub_mode = 0; 
 
-static int s_hour = 0, s_minute = 0, s_second = 0;
-static int s_day = 1, s_month = 1, s_year = 2026;
 static int a_hour = 7, a_minute = 0; 
 
 static bool last_mode = 1;
@@ -28,16 +34,6 @@ void init_buttons() {
     io_conf.pull_up_en = GPIO_PULLUP_ENABLE; 
     io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
     gpio_config(&io_conf);
-}
-
-void tick_clock() {
-    if (++s_second >= 60) { 
-        s_second = 0; 
-        if (++s_minute >= 60) { 
-            s_minute = 0; 
-            s_hour = (s_hour + 1) % 24; 
-        } 
-    }
 }
 
 bool check_buttons() {

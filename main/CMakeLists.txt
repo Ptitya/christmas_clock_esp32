@@ -1,3 +1,3 @@
 idf_component_register(SRCS "main.cpp"
-                    INCLUDE_DIRS "."
-                    REQUIRES driver esp_timer esp_wifi esp_event nvs_flash)
+                       INCLUDE_DIRS "."
+                       REQUIRES esp_http_server nvs_flash wifi_provisioning driver)
