@@ -7,7 +7,7 @@
 #include <stdio.h>
 
 #define BTN_MODE GPIO_NUM_13   
-#define BTN_INC  GPIO_NUM_14   
+#define BTN_INC  GPIO_NUM_27   // ย้ายมาใช้ขา 27 ปลอดภัยและเสถียรที่สุด
 
 static int current_mode = 0; // 0=เวลา, 1=อุณหภูมิ, 2=ตั้งวัน, 3=ตั้งเวลา, 4=ตั้งปลุก
 static int edit_sub_mode = 0; 
@@ -22,8 +22,11 @@ static bool last_inc = 1;
 void init_buttons() {
     gpio_config_t io_conf = {};
     io_conf.mode = GPIO_MODE_INPUT;
+    
+    // กำหนดพินและเปิดใช้ Pull-up ทั้งสองปุ่ม
     io_conf.pin_bit_mask = (1ULL << BTN_MODE) | (1ULL << BTN_INC);
     io_conf.pull_up_en = GPIO_PULLUP_ENABLE; 
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
     gpio_config(&io_conf);
 }
 
@@ -42,7 +45,7 @@ bool check_buttons() {
     bool curr_mode = gpio_get_level(BTN_MODE);
     bool curr_inc = gpio_get_level(BTN_INC);
 
-    // 1. ตรวจสอบปุ่ม MODE
+    // 1. ตรวจสอบปุ่ม MODE (ขา 13)
     if (curr_mode == 0 && last_mode == 1) { 
         vTaskDelay(pdMS_TO_TICKS(50)); 
         
@@ -65,7 +68,7 @@ bool check_buttons() {
     } 
     last_mode = curr_mode;
 
-    // 2. ตรวจสอบปุ่ม INC (เพิ่มค่าตัวเลข)
+    // 2. ตรวจสอบปุ่ม INC (ขา 27)
     if (curr_inc == 0 && last_inc == 1) {
         vTaskDelay(pdMS_TO_TICKS(50)); 
         
